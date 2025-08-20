@@ -59,7 +59,7 @@ class UsersService(BaseService):
 
         return self.find_one({"_id": user["_id"]}, projection={"_id": 0, "password": 0})
 
-    def signin(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def login(self, data: Dict[str, Any]) -> Dict[str, Any]:
         email = (data.get("email") or "").strip().lower()
         password = data.get("password") or ""
         if not email or not password:

@@ -21,12 +21,12 @@ def create_users_router(db: Database) -> Blueprint:
         
         return jsonify(created), 201
 
-    @bp.post("/signin")
-    def signin():
+    @bp.post("/login")
+    def login():
         data = request.get_json() or {}
 
         try:
-            user = service.signin(data)
+            user = service.login(data)
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
 

@@ -39,4 +39,9 @@ def create_users_router(db: Database) -> Blueprint:
             return jsonify({"error": "Not found"}), 404
         return jsonify(doc), 200
 
+    @bp.put("/<user_id>/avatar")
+    def update_user_avatar(user_id: str):
+        service.update_avatar(user_id)
+        return jsonify({"message": "Avatar mis à jour"}), 200
+
     return bp

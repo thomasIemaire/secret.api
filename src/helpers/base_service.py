@@ -15,7 +15,7 @@ class BaseService:
 
     collection_name: str = ""  # à définir dans la sous-classe
 
-    def __init__(self, db: Database, *, hide_mongo_id: bool = True) -> None:
+    def __init__(self, db: Database, *, hide_mongo_id: bool = False) -> None:
         self.db = db
         self._hide_mongo_id = hide_mongo_id
 

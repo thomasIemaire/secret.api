@@ -10,8 +10,16 @@ def create_app(config_object: Type[DefaultConfig] = DefaultConfig) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_object)
 
-    cors.init_app(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+    cors.init_app(
+        app,
+        resources={r"/api/*": {"origins": "*"}},
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        expose_headers=["Content-Type", "Authorization"],
+    )
+
     jwt.init_app(app)
+    _register_jwt_error_handlers(app)
 
     mongo_client = MongoClient(app.config["MONGO_URI"])
     db = mongo_client.get_database()
@@ -23,7 +31,6 @@ def create_app(config_object: Type[DefaultConfig] = DefaultConfig) -> Flask:
     _register_blueprints(app, db)
     return app
 
-
 def _register_blueprints(app: Flask, db):
     api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -31,11 +38,38 @@ def _register_blueprints(app: Flask, db):
     def root():
         return jsonify({"message": "'Gloup Gloup' I'm Sardine and this is my API !"}), 200
 
-    from src.app.agents import create_agents_router
-    api_bp.register_blueprint(create_agents_router(db), url_prefix="/agents")
+    from src.app.auth import create_auth_router
+    api_bp.register_blueprint(create_auth_router(db), url_prefix="/auth")
 
     from src.app.users import create_users_router
     api_bp.register_blueprint(create_users_router(db), url_prefix="/users")
 
+    from src.app.playgrounds import create_playgrounds_router
+    api_bp.register_blueprint(create_playgrounds_router(db), url_prefix="/playgrounds")
+
     app.register_blueprint(swaggerui_bp)
     app.register_blueprint(api_bp)
+
+def _register_jwt_error_handlers(app: Flask):
+    from flask import jsonify
+    from .extensions import jwt
+
+    @jwt.unauthorized_loader
+    def _unauthorized(msg):
+        return jsonify({"error": "authorization_required", "message": msg}), 401
+
+    @jwt.invalid_token_loader
+    def _invalid(msg):
+        return jsonify({"error": "invalid_token", "message": msg}), 422
+
+    @jwt.expired_token_loader
+    def _expired(jwt_header, jwt_payload):
+        return jsonify({"error": "token_expired", "message": "Access token has expired"}), 401
+
+    @jwt.needs_fresh_token_loader
+    def _needs_fresh(jwt_header, jwt_payload):
+        return jsonify({"error": "fresh_token_required"}), 401
+
+    @jwt.revoked_token_loader
+    def _revoked(jwt_header, jwt_payload):
+        return jsonify({"error": "token_revoked"}), 401

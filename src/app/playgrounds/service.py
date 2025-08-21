@@ -28,6 +28,12 @@ class PlaygroundsService(BaseService):
 class PlaygroundsPromptsService(BaseService):
     collection_name = "playground_prompts"
 
+    def verify_prompt_exists(self, prompt_id: str) -> Optional[Dict[str, Any]]:
+        prompt = self.find_one({"_id": ObjectId(prompt_id)})
+        if not prompt:
+            raise ValueError("Prompt not found")
+        return prompt
+
     def find_prompts_by_playground_id(self, playground_id: str) -> List[Dict[str, Any]]:
         return self.find({"playground_id": ObjectId(playground_id)})
 
@@ -38,11 +44,37 @@ class PlaygroundsPromptsService(BaseService):
 
         if not data.get("content") or not data.get("system"):
             raise ValueError("Prompt content and system are required")
+        
         prompt = {
             "playground_id": ObjectId(playground_id),
             "content": data["content"],
-            "system": data.get("system", None),
+            "system": {**data.get("system", {}), "evaluation": 0},
             "created_at": self.get_current_time(),
             "created_by": ObjectId(data.get("created_by")),
         }
         return self.insert_one(prompt)
+
+    def delete_prompt(self, prompt_id: str) -> None:
+        prompt = self.verify_prompt_exists(prompt_id)
+        self.delete_one({"_id": ObjectId(prompt_id)})
+
+    def like_prompt(self, prompt_id: str) -> None:
+        prompt = self.verify_prompt_exists(prompt_id)
+
+        if prompt.get("system", {}).get("evaluation") is 1:
+            self.reset_prompt_evaluation(prompt_id)
+        
+        self.update_one({"_id": ObjectId(prompt_id)}, {"system.evaluation": 1})
+
+    def dislike_prompt(self, prompt_id: str) -> None:
+        prompt = self.verify_prompt_exists(prompt_id)
+
+        if prompt.get("system", {}).get("evaluation") is -1:
+            self.reset_prompt_evaluation(prompt_id)
+
+        self.update_one({"_id": ObjectId(prompt_id)}, {"system.evaluation": -1})
+
+
+    def reset_prompt_evaluation(self, prompt_id: str) -> None:
+        self.update_one({"_id": ObjectId(prompt_id)}, {"system.evaluation": 0})
+        raise ValueError("Prompt evaluation reset to neutral")

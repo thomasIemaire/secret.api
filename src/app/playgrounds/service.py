@@ -28,7 +28,7 @@ class PlaygroundsService(BaseService):
 class PlaygroundsPromptsService(BaseService):
     collection_name = "playground_prompts"
 
-    def find_by_playground_id(self, playground_id: str) -> List[Dict[str, Any]]:
+    def find_prompts_by_playground_id(self, playground_id: str) -> List[Dict[str, Any]]:
         return self.find({"playground_id": ObjectId(playground_id)})
 
     def create_prompt(self, playground_id: str, data: Dict[str, Any]) -> Dict[str, Any]:

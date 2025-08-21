@@ -31,7 +31,7 @@ def create_playgrounds_router(db: Database) -> Blueprint:
     @bp.get("/<playground_id>")
     @jwt_required()
     def find_playground_by_id(playground_id: str):
-        doc = service.find_one(playground_id)
+        doc = prompts_service.find_prompts_by_playground_id(playground_id)
         if not doc:
             return jsonify({"error": "Not found"}), 404
         return jsonify(doc), 200

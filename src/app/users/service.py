@@ -9,7 +9,7 @@ class UsersService(BaseService):
     collection_name = "users"
 
     def find_user_by_id(self, user_id: str):
-        return self.find_one({"_id": ObjectId(user_id)})
+        return self.find_one({"_id": ObjectId(user_id)}, projection={"password": 0})
 
     def update_avatar(self, user_id: str) -> None:
         email = self.find_user_by_id(user_id).get("email")

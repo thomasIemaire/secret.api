@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Iterable, Tuple
 from pymongo.database import Database
 from pymongo.collection import Collection
 from bson.objectid import ObjectId
+from datetime import datetime
 
 Sort = Iterable[Tuple[str, int]]  # ex: [("created_at", -1)]
 
@@ -116,3 +117,6 @@ class BaseService:
             return [self.serialize(item) for item in response]
         else:
             return response
+    
+    def get_current_time(self) -> str:
+        return datetime.utcnow().isoformat()

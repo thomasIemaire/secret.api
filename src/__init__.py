@@ -47,6 +47,12 @@ def _register_blueprints(app: Flask, db):
     from src.app.playgrounds import create_playgrounds_router
     api_bp.register_blueprint(create_playgrounds_router(db), url_prefix="/playgrounds")
 
+    from src.app.models import create_models_router
+    api_bp.register_blueprint(create_models_router(db), url_prefix="/models")
+
+    from src.app.configurations import create_configurations_router
+    api_bp.register_blueprint(create_configurations_router(db), url_prefix="/configurations")
+
     app.register_blueprint(swaggerui_bp)
     app.register_blueprint(api_bp)
 

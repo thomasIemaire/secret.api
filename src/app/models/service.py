@@ -3,13 +3,13 @@ from pymongo.database import Database
 from bson.objectid import ObjectId
 from src.app.configurations.service import ConfigurationsService
 from src.helpers.base_service import BaseService
-import copy, random, uuid, re
+import copy, random, uuid, re, time
 
 class ModelsService(BaseService):
     collection_name = "models"
 
     def find_all(self) -> list[dict]:
-        return self.find(sort=[("updated_at", -1)], projection={"mapper": 0, "parameters": 0, "configuration": 0})
+        return self.find(sort=[("updated_at", -1)], projection={"mapper": 0, "configuration": 0})
 
     def create(self, user_id: str, model_data: dict) -> ObjectId:
         doc = {
@@ -18,7 +18,6 @@ class ModelsService(BaseService):
             "reference": model_data.get("reference", ""),
             "version": model_data.get("version", "1.0"),
             "mapper": model_data.get("mapper", {}),
-            "parameters": model_data.get("parameters", {}),
             "created_by": ObjectId(user_id),
             "updated_by": ObjectId(user_id),
             "created_at": self.get_current_time(),
@@ -29,15 +28,15 @@ class ModelsService(BaseService):
         self.col.insert_one(doc)
 
         return self.serialize(doc)
-    
-    def build_model(self, model_id: str) -> dict:
+
+    def build_model(self, model_id: str, parameters: dict) -> dict:
         model = self.find_one({"_id": ObjectId(model_id)})
         if not model:
             raise ValueError("Model not found")
         
         ments = model.get("entities", {})
         mkeys = list(ments.values())
-        
+
         mcid = model.get("configuration", None)
         if not mcid:
             raise ValueError("Model configuration is missing")
@@ -46,20 +45,23 @@ class ModelsService(BaseService):
         if not configuration:
             raise ValueError("Model configuration not found")
         
-        mpar = model.get("parameters", {})
-
         dataset = []
         seed = str(uuid.uuid4())
         chunk_size = 5*1e3
 
-        for _ in range(mpar.get("dataset_size", 1e5)):
-            print(_)
+        n_max = configuration.get("possibilities", 1e5)
+        n_size = parameters.get("dataset_size", n_max)
+        if type(n_size) is str:
+            n_size = self.model_build_calculate_size(n_size, n_max, len(configuration.get("formats", [])))
 
+        print(n_size)
+
+        for _ in range(n_size):
             mvb = self.build_model_configuration(copy.deepcopy(configuration))
 
             mrd = random.choice(model.get("randomizers", []))
-            if mrd and mrd.get("frequency", 0) >= random.random():
-                mvb = self.build_model_configuration_randomizers(mvb)
+            rdm = self.build_model_configuration_randomizers(mrd)
+            mvb["format"] = rdm(mvb["format"])
             
             dataset.append(
                 self.build_model_entity(
@@ -69,11 +71,31 @@ class ModelsService(BaseService):
                 )
             )
 
-            print(mvb.get("value", ""), dataset[-1])
+            time.sleep(1e-9)
+        
+        return self.model_build_example(dataset, ments, examples_size=parameters.get("examples_size", 3))
+
+    def model_build_calculate_size(
+            self,
+            size: str,
+            max_size: int,
+            formats_size: int
+        ) -> int:
+        match size:
+            case "complete":
+                return max_size
+            case "advanced":
+                return max_size // 2
+            case "recommended":
+                return max_size // formats_size
+            case "small":
+                return max_size // formats_size // 2
+            case "tiny":
+                return max_size // formats_size // 5
+            case _:
+                return int(1e3)
 
     def build_model_configuration(self, configuration: dict) -> dict:
-        print(configuration)
-
         catt = configuration.get("attributes")
         cfmt = configuration.get("formats")
 
@@ -93,8 +115,6 @@ class ModelsService(BaseService):
                 pvattr = vattr.get("parameters", {})
                 bvattr, bcattrs = self.build_model_configuration_value(tvattr, rvattr, pvattr)
 
-                print(bvattr, bcattrs)
-
                 if bcattrs:
                     for bcattr in bcattrs:
                         satt.append(bcattr)
@@ -105,11 +125,9 @@ class ModelsService(BaseService):
                 "requirements": self.build_model_configuration_requirements(bvattr, rattr) if vattr else True
             })
 
-            print(satt[-1])
-
         bfmt = self.build_model_configuration_format(sfmt, satt)
         configuration['attributes'] = satt
-        configuration['value'] = re.sub(r'\s+', ' ', bfmt.strip())
+        configuration['format'] = re.sub(r'\s+', ' ', bfmt.strip())
 
         return configuration
 
@@ -129,16 +147,17 @@ class ModelsService(BaseService):
                 value = random.randint(vmin, vmax)
 
             case "data":
-                data_id = parameters.get("object_id", [])
-                data = self.db["data"].find_one({"_id": ObjectId(data_id)})
-                value = random.choice(data.get("values", []))
+                data_id = parameters.get("object_id")
+                if data_id:
+                    data = self.db["configurations_data"].find_one({"_id": ObjectId(data_id)})
+                    value = random.choice(data.get("data", []))
 
             case "configuration":
                 config_id = parameters.get("object_id")
                 config = self.db["models"].find_one({"_id": ObjectId(config_id)})
                 value = self.build_model_configuration(config.get("configuration", {}))
         
-        if value is None: return None
+        if value is None: return None, None
             
         return self.build_model_configuration_vtype(vtype, value), None
     
@@ -217,13 +236,32 @@ class ModelsService(BaseService):
             format = format.replace(f"{{{kattr}}}", str(vattr))
         return format
     
+    def build_model_configuration_randomizers(
+        self,
+        randomizer:  str
+    ) -> lambda x: x:
+        rrand = randomizer.get("rule")
+        frand = randomizer.get("frequency", 1)
+
+        f = None
+
+        match rrand:
+            case "upper":
+                f = lambda x: x.upper()
+            case "lower":
+                f = lambda x: x.lower()
+            case _:
+                f = lambda x: x
+
+        return f if frand >= random.random() else lambda x: x
+
     def build_model_entity(
         self,
         configuration: dict,
         keys: list[str],
         map: dict
     ) -> dict:
-        vfmt = configuration.get("value", "")
+        vfmt = configuration.get("format", "")
         ents = []
 
         for attr in configuration.get("attributes", []):
@@ -238,10 +276,40 @@ class ModelsService(BaseService):
 
             enttok = map.get(kattr)
 
-            sta = vfmt.lower().find(vattr.lower())
+            strvattr = str(vattr)
+            sta = vfmt.lower().find(strvattr.lower()) if vattr else -1
             if sta == -1: continue
-            end = sta + len(vattr)
+            end = sta + len(strvattr)
 
             ents.append([sta, end, enttok])
         
         return { "text": vfmt, "entities": ents }
+    
+    def model_build_example(
+        self,
+        dataset: list[dict],
+        entities: list[str],
+        *,
+        examples_size: int = 3
+    ) -> list[dict]:
+        dataset = dataset[0:examples_size] if len(dataset) >= examples_size else dataset
+        res = []
+
+        for data in dataset:
+            dtext = data.get("text", "")
+            dents = data.get("entities", [])
+            rents = []
+
+            for ent in dents:
+                sta, end, enttok = ent
+                vent = dtext[sta:end]
+                vtok = entities[enttok]
+
+                rents.append({ "key": vtok, "value": vent })
+            
+            res.append({
+                "text": dtext,
+                "entities": rents
+            })
+
+        return res

@@ -29,7 +29,8 @@ def create_models_router(db: Database) -> Blueprint:
     @jwt_required()
     def build_model(model_id):
         try:
-            model = service.build_model(model_id)
+            parameters = request.json or {}
+            model = service.build_model(model_id, parameters)
             return jsonify(model), 200
         except ValueError as e:
             return jsonify({"error": str(e)}), 400

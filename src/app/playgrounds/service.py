@@ -26,7 +26,7 @@ class PlaygroundsService(BaseService):
         return self.insert_one(playground)
         
 class PlaygroundsPromptsService(BaseService):
-    collection_name = "playground_prompts"
+    collection_name = "playgrounds_prompts"
 
     def verify_prompt_exists(self, prompt_id: str) -> Optional[Dict[str, Any]]:
         prompt = self.find_one({"_id": ObjectId(prompt_id)})

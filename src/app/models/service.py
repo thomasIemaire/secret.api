@@ -60,7 +60,6 @@ class ModelsService(BaseService):
         
         dataset = []
         seed = str(uuid.uuid4())
-        chunk_size = 5*1e3
 
         n_max = configuration.get("possibilities", 1e5)
         n_size = parameters.get("dataset_size", n_max)
@@ -87,7 +86,18 @@ class ModelsService(BaseService):
             )
 
             time.sleep(1e-9)
-        
+
+        self.db["datasets"].insert_one({
+            "model": ObjectId(model_id),
+            "version": model.get("version", "1.0"),
+            "seed": seed,
+            "parameters": parameters,
+            "created_at": self.get_current_time()
+        })
+
+        for data in dataset:
+            self.db["datasets_data"].insert_one({ "seed": seed, "data": data })
+
         return self.model_build_example(dataset, ments, examples_size=parameters.get("examples_size", 3))
 
     def model_build_calculate_size(
@@ -164,13 +174,14 @@ class ModelsService(BaseService):
             case "data":
                 data_id = parameters.get("object_id")
                 if data_id:
-                    data = self.db["configurations_data"].find_one({"_id": ObjectId(data_id)})
+                    data = self.db["models_data"].find_one({"_id": ObjectId(data_id)})
                     value = random.choice(data.get("data", []))
 
             case "configuration":
                 config_id = parameters.get("object_id")
-                config = self.db["models"].find_one({"_id": ObjectId(config_id)})
-                value = self.build_model_configuration(config.get("configuration", {}))
+                if config_id:
+                    config = self.db["models_configurations"].find_one({"_id": ObjectId(config_id)})
+                    value = self.build_model_configuration(config.get("configuration", {}))
         
         if value is None: return None, None
             

@@ -4,7 +4,7 @@ from src.helpers.base_service import BaseService
 import random, re
 
 class ConfigurationsService(BaseService):
-    collection_name = "configurations"
+    collection_name = "models_configurations"
 
     def find_all(self) -> list[dict]:
         return self.find(sort=[("created_at", -1)], projection={"attributes": 0, "formats": 0, "randomizers": 0})
@@ -58,7 +58,7 @@ class ConfigurationsService(BaseService):
                 data_id = parameters.get("object_id")
                 data = None
                 if data_id:
-                    data = self.db["configurations_data"].find_one({"_id": ObjectId(data_id)})
+                    data = self.db["models_data"].find_one({"_id": ObjectId(data_id)})
                 return len(data.get("data", [])) if data else 1
             case "configuration":
                 config_id = parameters.get("object_id")

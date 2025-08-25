@@ -24,5 +24,14 @@ def create_models_router(db: Database) -> Blueprint:
             return jsonify({"error": "Bad request"}), 400
         model = service.create(user_id, data)
         return jsonify(model), 201
+    
+    @bp.post("/build/<model_id>")
+    @jwt_required()
+    def build_model(model_id):
+        try:
+            model = service.build_model(model_id)
+            return jsonify(model), 200
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
 
     return bp

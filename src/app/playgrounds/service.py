@@ -35,7 +35,7 @@ class PlaygroundsPromptsService(BaseService):
         return prompt
 
     def find_prompts_by_playground_id(self, playground_id: str) -> List[Dict[str, Any]]:
-        return self.find({"playground_id": ObjectId(playground_id)})
+        return self.find({"playground": ObjectId(playground_id)})
 
     def create_prompt(self, playground_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         playground = PlaygroundsService(db=self.db).find_one({"_id": ObjectId(playground_id)})
@@ -46,7 +46,7 @@ class PlaygroundsPromptsService(BaseService):
             raise ValueError("Prompt content and system are required")
         
         prompt = {
-            "playground_id": ObjectId(playground_id),
+            "playground": ObjectId(playground_id),
             "content": data["content"],
             "system": {**data.get("system", {}), "evaluation": 0},
             "created_at": self.get_current_time(),

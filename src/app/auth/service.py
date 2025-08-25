@@ -46,7 +46,7 @@ class AuthService(BaseService):
             "lastname": data["lastname"],
             "apikey": apikey,
             "password": self.hash_password(data["password"], apikey),
-            "role": 1,
+            "role": "user",
         }
 
         self.insert_one(user)

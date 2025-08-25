@@ -17,17 +17,30 @@ class ModelsService(BaseService):
             "description": model_data.get("description", ""),
             "reference": model_data.get("reference", ""),
             "version": model_data.get("version", "1.0"),
+            "configuration": ObjectId(model_data.get("configuration", None)),
+            "randomizers": model_data.get("randomizers", []),
             "mapper": model_data.get("mapper", {}),
+            "entities": model_data.get("entities", {}),
+            "labels": self.build_model_labels(model_data.get("entities", {})),
             "created_by": ObjectId(user_id),
-            "updated_by": ObjectId(user_id),
             "created_at": self.get_current_time(),
-            "updated_at": self.get_current_time(),
-            "status": "wainting",
         }
 
         self.col.insert_one(doc)
 
         return self.serialize(doc)
+
+    def build_model_labels(
+        self,
+        entities: dict
+    ) -> list[str]:
+        labels = ["O"]
+
+        for ent in entities.keys():
+            labels.append(f"B-{ent}")
+            labels.append(f"I-{ent}")
+        
+        return labels
 
     def build_model(self, model_id: str, parameters: dict) -> dict:
         model = self.find_one({"_id": ObjectId(model_id)})
@@ -59,9 +72,11 @@ class ModelsService(BaseService):
         for _ in range(n_size):
             mvb = self.build_model_configuration(copy.deepcopy(configuration))
 
-            mrd = random.choice(model.get("randomizers", []))
-            rdm = self.build_model_configuration_randomizers(mrd)
-            mvb["format"] = rdm(mvb["format"])
+            try:
+                mrd = random.choice(model.get("randomizers", []))
+                rdm = self.build_model_configuration_randomizers(mrd)
+                mvb["format"] = rdm(mvb["format"])
+            except: pass
             
             dataset.append(
                 self.build_model_entity(

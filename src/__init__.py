@@ -53,6 +53,9 @@ def _register_blueprints(app: Flask, db):
     from src.app.configurations import create_configurations_router
     api_bp.register_blueprint(create_configurations_router(db), url_prefix="/configurations")
 
+    from src.app.data import create_data_router
+    api_bp.register_blueprint(create_data_router(db), url_prefix="/data")
+
     app.register_blueprint(swaggerui_bp)
     app.register_blueprint(api_bp)
 

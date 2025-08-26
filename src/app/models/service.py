@@ -59,14 +59,11 @@ class ModelsService(BaseService):
             raise ValueError("Model configuration not found")
         
         dataset = []
-        seed = str(uuid.uuid4())
 
         n_max = configuration.get("possibilities", 1e5)
         n_size = parameters.get("dataset_size", n_max)
         if type(n_size) is str:
             n_size = self.model_build_calculate_size(n_size, n_max, len(configuration.get("formats", [])))
-
-        print(n_size)
 
         for _ in range(n_size):
             mvb = self.build_model_configuration(copy.deepcopy(configuration))
@@ -87,16 +84,20 @@ class ModelsService(BaseService):
 
             time.sleep(1e-9)
 
-        self.db["datasets"].insert_one({
+        docdt = self.db["datasets"].insert_one({
             "model": ObjectId(model_id),
             "version": model.get("version", "1.0"),
-            "seed": seed,
             "parameters": parameters,
             "created_at": self.get_current_time()
         })
 
         for data in dataset:
-            self.db["datasets_data"].insert_one({ "seed": seed, "data": data })
+            self.db["datasets_data"].insert_one({ "dataset": docdt.inserted_id, "data": data })
+
+        self.db["datasets"].update_one(
+            {"_id": docdt.inserted_id},
+            {"$set": {"status": "pending"}}
+        )
 
         return self.model_build_example(dataset, ments, examples_size=parameters.get("examples_size", 3))
 

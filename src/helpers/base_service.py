@@ -119,4 +119,4 @@ class BaseService:
             return response
     
     def get_current_time(self) -> str:
-        return datetime.utcnow().isoformat()
+        return datetime.utcnow()

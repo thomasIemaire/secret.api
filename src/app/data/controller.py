@@ -11,7 +11,7 @@ def create_data_router(db: Database) -> Blueprint:
     @bp.get("/")
     @jwt_required()
     def find_data():
-        docs = service.find_all()
+        docs = service.find()
         if not docs:
             return jsonify({"error": "Not found"}), 404
         return jsonify(docs), 200

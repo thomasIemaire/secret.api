@@ -1,51 +1,84 @@
-from flask import Flask, jsonify, Blueprint
-from flask_jwt_extended import JWTManager
-from flask_swagger_ui import get_swaggerui_blueprint
-from flask_cors import CORS
-from config import Config
+from flask import Flask, Blueprint, jsonify
 from pymongo import MongoClient
+from typing import Type
+import atexit
 
-jwt = JWTManager()
+from config import Config as DefaultConfig
+from .extensions import cors, jwt, swaggerui_bp
 
-swaggerui_bp = get_swaggerui_blueprint(
-    '/swagger',
-    '/static/swagger.json',
-    config={ 'app_name': "Sardine's API" }
-)
+def create_app(config_object: Type[DefaultConfig] = DefaultConfig) -> Flask:
+    app = Flask(__name__, static_folder="public", static_url_path="/public")
+    app.config.from_object(config_object)
 
-api_keys: list[str] = ["super_secret_key"]
-
-def create_app() -> Flask:
-    app = Flask(__name__)
-
-    CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
-
-    app.config.from_object(Config)
+    cors.init_app(
+        app,
+        resources={r"/api/*": {"origins": "*"}},
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        expose_headers=["Content-Type", "Authorization"],
+    )
 
     jwt.init_app(app)
+    _register_jwt_error_handlers(app)
 
     mongo_client = MongoClient(app.config["MONGO_URI"])
-    app.mongo = mongo_client.get_database()
+    db = mongo_client.get_database()
+    app.mongo_client = mongo_client
+    app.mongo_db = db
 
-    set_routes(app)
+    atexit.register(mongo_client.close)
 
+    _register_blueprints(app, db)
     return app
 
-def set_routes(app: Flask) -> None:
-    api_router = Blueprint('api', __name__, url_prefix='/api')
+def _register_blueprints(app: Flask, db):
+    api_bp = Blueprint("api", __name__, url_prefix="/api")
 
-    @api_router.route("/", methods=["GET"])
-    def init():
-        return jsonify({ "message": "Welcome on Sardine's API !"}), 200
-    
+    @api_bp.get("/")
+    def root():
+        return jsonify({"message": "'Gloup Gloup' I'm Sardine and this is my API !"}), 200
+
+    from src.app.auth import create_auth_router
+    api_bp.register_blueprint(create_auth_router(db), url_prefix="/auth")
+
+    from src.app.users import create_users_router
+    api_bp.register_blueprint(create_users_router(db), url_prefix="/users")
+
+    from src.app.playgrounds import create_playgrounds_router
+    api_bp.register_blueprint(create_playgrounds_router(db), url_prefix="/playgrounds")
+
+    from src.app.models import create_models_router
+    api_bp.register_blueprint(create_models_router(db), url_prefix="/models")
+
+    from src.app.configurations import create_configurations_router
+    api_bp.register_blueprint(create_configurations_router(db), url_prefix="/configurations")
+
+    from src.app.data import create_data_router
+    api_bp.register_blueprint(create_data_router(db), url_prefix="/data")
+
     app.register_blueprint(swaggerui_bp)
+    app.register_blueprint(api_bp)
 
-    from src.app.flows.flows_controller import create_flows_router
-    from src.app.agents.agents_controller import create_agents_router
-    from src.app.predicts.predicts_controller import create_predicts_router
+def _register_jwt_error_handlers(app: Flask):
+    from flask import jsonify
+    from .extensions import jwt
 
-    api_router.register_blueprint(create_flows_router(app.mongo), url_prefix='/flows')
-    api_router.register_blueprint(create_agents_router(app.mongo), url_prefix='/agents')
-    api_router.register_blueprint(create_predicts_router(app.mongo), url_prefix='/predicts')
+    @jwt.unauthorized_loader
+    def _unauthorized(msg):
+        return jsonify({"error": "authorization_required", "message": msg}), 401
 
-    app.register_blueprint(api_router)
+    @jwt.invalid_token_loader
+    def _invalid(msg):
+        return jsonify({"error": "invalid_token", "message": msg}), 422
+
+    @jwt.expired_token_loader
+    def _expired(jwt_header, jwt_payload):
+        return jsonify({"error": "token_expired", "message": "Access token has expired"}), 401
+
+    @jwt.needs_fresh_token_loader
+    def _needs_fresh(jwt_header, jwt_payload):
+        return jsonify({"error": "fresh_token_required"}), 401
+
+    @jwt.revoked_token_loader
+    def _revoked(jwt_header, jwt_payload):
+        return jsonify({"error": "token_revoked"}), 401

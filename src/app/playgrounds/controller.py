@@ -1,7 +1,9 @@
 from flask import Blueprint, jsonify, request
 from pymongo.database import Database
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-from .service import PlaygroundsService, PlaygroundsPromptsService
+
+from .service import PlaygroundsService
+from src.app.playgrounds_prompts.service import PlaygroundsPromptsService
 
 def create_playgrounds_router(db: Database) -> Blueprint:
     bp = Blueprint("playgrounds", __name__)
@@ -10,12 +12,11 @@ def create_playgrounds_router(db: Database) -> Blueprint:
 
     @bp.get("/")
     @jwt_required()
-    def find_playgrounds_by_user_id():
-        user_id = get_jwt_identity()
-        doc = service.find_by_user_id(user_id)
-        if not doc:
+    def find_playgrounds_for_user():
+        playgrounds = service.find_by_user_id(get_jwt_identity())
+        if not playgrounds:
             return jsonify({"error": "Not found"}), 404
-        return jsonify(doc), 200
+        return jsonify(playgrounds), 200
 
     @bp.post("/")
     @jwt_required()
@@ -31,10 +32,10 @@ def create_playgrounds_router(db: Database) -> Blueprint:
     @bp.get("/<playground_id>")
     @jwt_required()
     def find_playground_by_id(playground_id: str):
-        doc = prompts_service.find_prompts_by_playground_id(playground_id)
-        if not doc:
+        prompts = prompts_service.find_prompts_by_playground_id(playground_id)
+        if not prompts:
             return jsonify({"error": "Not found"}), 404
-        return jsonify(doc), 200
+        return jsonify(prompts), 200
 
     @bp.post("/<playground_id>")
     @jwt_required()

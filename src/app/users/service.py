@@ -1,15 +1,28 @@
 import random
 from pymongo.database import Database
-from bson.objectid import ObjectId
-from src.helpers.base_service import BaseService
 from src.helpers.avatar import generate_avatar
 import os
 
+from src.helpers.base_service import BaseService
+
+from src.app.users.dao import UsersDao
+
 class UsersService(BaseService):
-    collection_name = "users"
+
+    def __init__(self, db: Database) -> None:
+        super().__init__(db)
+        self.users_dao = UsersDao(self.db)
 
     def find_user_by_id(self, user_id: str):
-        return self.find_one({"_id": ObjectId(user_id)}, projection={"password": 0})
+        user = self.users_dao.find_one(user_id)
+        if not user:
+            raise ValueError("User not found")
+        
+        user.pop("password", None)
+        return user
+    
+    def find_users(self):
+        return self.users_dao.find(projection={"password": 0})
 
     def update_avatar(self, user_id: str) -> None:
         email = self.find_user_by_id(user_id).get("email")

@@ -6,3 +6,6 @@ venv/
 *.pyc
 .env
 src/static/agents/
+src/public/
+flask.log
+run.log

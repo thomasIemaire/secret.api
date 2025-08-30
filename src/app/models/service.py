@@ -3,6 +3,7 @@ from pymongo.database import Database
 from bson.objectid import ObjectId
 from src.app.configurations.service import ConfigurationsService
 from src.helpers.base_service import BaseService
+from src.helpers import utils
 import copy, random, uuid, re, time
 
 class ModelsService(BaseService):
@@ -47,6 +48,7 @@ class ModelsService(BaseService):
         if not model:
             raise ValueError("Model not found")
         
+        mversion = model.get("version", "1.0")
         ments = model.get("entities", {})
         mkeys = list(ments.values())
 
@@ -86,7 +88,7 @@ class ModelsService(BaseService):
 
         docdt = self.db["datasets"].insert_one({
             "model": ObjectId(model_id),
-            "version": model.get("version", "1.0"),
+            "version": mversion,
             "parameters": parameters,
             "created_at": self.get_current_time()
         })
@@ -97,6 +99,11 @@ class ModelsService(BaseService):
         self.db["datasets"].update_one(
             {"_id": docdt.inserted_id},
             {"$set": {"status": "pending"}}
+        )
+
+        self.col.update_one(
+            {"_id": ObjectId(model_id)},
+            {"$set": { "version": utils.bump_version(mversion, "minor"), "updated_at": self.get_current_time()}}
         )
 
         return self.model_build_example(dataset, ments, examples_size=parameters.get("examples_size", 3))

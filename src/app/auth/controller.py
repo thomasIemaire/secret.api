@@ -29,11 +29,25 @@ def create_auth_router(db: Database) -> Blueprint:
 
         return jsonify(user), 200
     
-    @bp.get("/refresh")
+    @bp.post("/token")
     @jwt_required()
-    def refresh():
+    def token():
         current_user = get_jwt_identity()
-        token, refresh = service.token(user_id=current_user)
-        return jsonify({"token": token, "refresh_token": refresh}), 200
+        
+        try:
+            user = service.login_token(current_user)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+
+        return jsonify(user), 200
+    
+    @bp.get("/email-exists")
+    def email_exists():
+        email = request.args.get("email")
+        if not email:
+            return jsonify({"error": "Email parameter is required"}), 400
+        
+        exists = service.email_exists(email)
+        return jsonify({"exists": exists}), 200
 
     return bp

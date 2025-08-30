@@ -90,3 +90,17 @@ class AuthService(BaseService):
         refresh = create_refresh_token(identity=user_id)
 
         return (token, refresh)
+    
+    def login_token(self, user_id: str) -> Dict[str, Any]:
+        user = self.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            raise ValueError("Utilisateur introuvable")
+        
+        user.pop("password", None)
+        token, refresh = self.token(user=user)
+
+        return {"token": token, "refresh_token": refresh, "user": user}
+
+    def email_exists(self, email: str) -> bool:
+        email = email.strip().lower()
+        return self.find_one({"email": email}) is not None

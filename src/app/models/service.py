@@ -6,11 +6,17 @@ from src.helpers.base_service import BaseService
 from src.helpers import utils
 import copy, random, uuid, re, time
 
+from .dao import ModelsDao
+
+
 class ModelsService(BaseService):
-    collection_name = "models"
+
+    def __init__(self, db: Database) -> None:
+        super().__init__(db)
+        self.models_dao = ModelsDao(db)
 
     def find_all(self) -> list[dict]:
-        return self.find(sort=[("updated_at", -1)], projection={"mapper": 0, "configuration": 0})
+        return self.models_dao.find(sort=[("updated_at", -1)], projection={"mapper": 0, "configuration": 0})
 
     def create(self, user_id: str, model_data: dict) -> ObjectId:
         doc = {
@@ -24,12 +30,12 @@ class ModelsService(BaseService):
             "entities": model_data.get("entities", {}),
             "labels": self.build_model_labels(model_data.get("entities", {})),
             "created_by": ObjectId(user_id),
-            "created_at": self.get_current_time(),
+            "created_at": self.models_dao.get_current_time(),
         }
 
-        self.col.insert_one(doc)
+        self.models_dao.insert_one(doc)
 
-        return self.serialize(doc)
+        return self.models_dao.serialize(doc)
 
     def build_model_labels(
         self,
@@ -44,7 +50,7 @@ class ModelsService(BaseService):
         return labels
 
     def build_model(self, model_id: str, parameters: dict) -> dict:
-        model = self.find_one({"_id": ObjectId(model_id)})
+        model = self.models_dao.find_one({"_id": ObjectId(model_id)})
         if not model:
             raise ValueError("Model not found")
         
@@ -90,7 +96,7 @@ class ModelsService(BaseService):
             "model": ObjectId(model_id),
             "version": mversion,
             "parameters": parameters,
-            "created_at": self.get_current_time()
+            "created_at": self.models_dao.get_current_time()
         })
 
         for data in dataset:
@@ -101,9 +107,9 @@ class ModelsService(BaseService):
             {"$set": {"status": "pending"}}
         )
 
-        self.col.update_one(
+        self.models_dao.update_one(
             {"_id": ObjectId(model_id)},
-            {"$set": { "version": utils.bump_version(mversion, "minor"), "updated_at": self.get_current_time()}}
+            {"$set": {"version": utils.bump_version(mversion, "minor"), "updated_at": self.models_dao.get_current_time()}}
         )
 
         return self.model_build_example(dataset, ments, examples_size=parameters.get("examples_size", 3))

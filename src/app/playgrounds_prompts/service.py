@@ -47,7 +47,7 @@ class PlaygroundsPromptsService(BaseService):
     def like_prompt(self, prompt_id: str) -> None:
         prompt = self.find_prompt_by_id(prompt_id)
 
-        if prompt.get("system", {}).get("evaluation") is 1:
+        if prompt.get("system", {}).get("evaluation") == 1:
             self.reset_prompt_evaluation(prompt_id)
         
         self.update_evaluation(prompt_id, 1)
@@ -55,7 +55,7 @@ class PlaygroundsPromptsService(BaseService):
     def dislike_prompt(self, prompt_id: str) -> None:
         prompt = self.find_prompt_by_id(prompt_id)
 
-        if prompt.get("system", {}).get("evaluation") is -1:
+        if prompt.get("system", {}).get("evaluation") == -1:
             self.reset_prompt_evaluation(prompt_id)
 
         self.update_evaluation(prompt_id, -1)

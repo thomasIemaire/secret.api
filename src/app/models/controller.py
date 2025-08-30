@@ -1,6 +1,8 @@
 from flask import Blueprint, jsonify, request
 from pymongo.database import Database
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask_jwt_extended import get_jwt_identity, jwt_required
+
+from src.helpers.utils import json_error
 from .service import ModelsService
 
 def create_models_router(db: Database) -> Blueprint:
@@ -12,27 +14,27 @@ def create_models_router(db: Database) -> Blueprint:
     def find_models():
         docs = service.find_all()
         if not docs:
-            return jsonify({"error": "Not found"}), 404
+            return json_error("Not found", 404)
         return jsonify(docs), 200
     
     @bp.post("/")
     @jwt_required()
     def create_model():
         user_id = get_jwt_identity()
-        data = request.json
-        if not data:
-            return jsonify({"error": "Bad request"}), 400
-        model = service.create(user_id, data)
+        payload = request.get_json(silent=True)
+        if not payload:
+            return json_error("Bad request")
+        model = service.create(user_id, payload)
         return jsonify(model), 201
     
     @bp.post("/build/<model_id>")
     @jwt_required()
     def build_model(model_id):
         try:
-            parameters = request.json or {}
+            parameters = request.get_json(silent=True) or {}
             model = service.build_model(model_id, parameters)
             return jsonify(model), 200
         except ValueError as e:
-            return jsonify({"error": str(e)}), 400
+            return json_error(str(e))
 
     return bp

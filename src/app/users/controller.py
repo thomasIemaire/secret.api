@@ -1,6 +1,8 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from pymongo.database import Database
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
+
+from src.helpers.utils import json_error
 from .service import UsersService
 
 def create_users_router(db: Database) -> Blueprint:
@@ -17,7 +19,7 @@ def create_users_router(db: Database) -> Blueprint:
     def find_me():
         user = service.find_user_by_id(get_jwt_identity())
         if not user:
-            return jsonify({"error": "Not found"}), 404
+            return json_error("Not found", 404)
         return jsonify(user), 200
     
     @bp.put("/me/avatar")

@@ -1,6 +1,8 @@
 from flask import Blueprint, jsonify, request
 from pymongo.database import Database
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
+
+from src.helpers.utils import json_error
 from .service import AuthService
 
 def create_auth_router(db: Database) -> Blueprint:
@@ -14,7 +16,7 @@ def create_auth_router(db: Database) -> Blueprint:
         try:
             created = service.register(data)
         except ValueError as e:
-            return jsonify({"error": str(e)}), 400
+            return json_error(str(e))
         
         return jsonify(created), 201
 
@@ -25,7 +27,7 @@ def create_auth_router(db: Database) -> Blueprint:
         try:
             user = service.login(data)
         except ValueError as e:
-            return jsonify({"error": str(e)}), 400
+            return json_error(str(e))
 
         return jsonify(user), 200
     
@@ -37,7 +39,7 @@ def create_auth_router(db: Database) -> Blueprint:
         try:
             user = service.login_token(current_user)
         except ValueError as e:
-            return jsonify({"error": str(e)}), 400
+            return json_error(str(e))
 
         return jsonify(user), 200
     
@@ -45,7 +47,7 @@ def create_auth_router(db: Database) -> Blueprint:
     def email_exists():
         email = request.args.get("email")
         if not email:
-            return jsonify({"error": "Email parameter is required"}), 400
+            return json_error("Email parameter is required")
         
         exists = service.email_exists(email)
         return jsonify({"exists": exists}), 200

@@ -1,5 +1,12 @@
+"""Base class for service layers."""
+
+from dataclasses import dataclass
 from pymongo.database import Database
 
+
+@dataclass(slots=True)
 class BaseService:
-    def __init__(self, db: Database) -> None:
-        self.db = db
+    """Simple container for the Mongo database instance."""
+
+    db: Database
+

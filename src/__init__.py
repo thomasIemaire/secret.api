@@ -1,5 +1,6 @@
-from flask import Flask, Blueprint, jsonify
+from flask import Blueprint, Flask, jsonify
 from pymongo import MongoClient
+from pymongo.database import Database
 from typing import Type
 import atexit
 
@@ -31,7 +32,7 @@ def create_app(config_object: Type[DefaultConfig] = DefaultConfig) -> Flask:
     _register_blueprints(app, db)
     return app
 
-def _register_blueprints(app: Flask, db):
+def _register_blueprints(app: Flask, db: Database) -> None:
     api_bp = Blueprint("api", __name__, url_prefix="/api")
 
     @api_bp.get("/")

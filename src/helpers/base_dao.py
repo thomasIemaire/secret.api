@@ -1,38 +1,40 @@
+"""Base DAO providing common MongoDB operations."""
+
 from __future__ import annotations
-from typing import Any, Dict, List, Optional, Iterable, Tuple
-from pymongo.database import Database
-from pymongo.collection import Collection
-from bson.objectid import ObjectId
+
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple
 
-Sort = Iterable[Tuple[str, int]]  # ex: [("created_at", -1)]
+from bson.objectid import ObjectId
+from pymongo.collection import Collection
+from pymongo.database import Database
 
+Sort = Iterable[Tuple[str, int]]  # example: [("created_at", -1)]
+
+
+@dataclass(slots=True)
 class BaseDao:
-    """CRUD générique pour une collection Mongo.
+    """CRUD helper for Mongo collections."""
 
-    Les services métiers héritent de cette classe et définissent
-    `collection_name = "ma_collection"`.
-    """
+    db: Database
+    _hide_mongo_id: bool = False
 
-    collection_name: str = ""  # à définir dans la sous-classe
+    collection_name: ClassVar[str] = ""  # must be defined in subclasses
 
-    def __init__(self, db: Database, *, hide_mongo_id: bool = False) -> None:
-        self.db = db
-        self._hide_mongo_id = hide_mongo_id
-
-    # -- Collection ----------------------------------------------------------
+    # -- Collection ---------------------------------------------------------
     @property
     def col(self) -> Collection:
         if not self.collection_name:
-            raise ValueError("collection_name must be set on subclass")
+            msg = "collection_name must be set on subclass"
+            raise ValueError(msg)
         return self.db[self.collection_name]
 
     @property
     def default_projection(self) -> Dict[str, int]:
-        # Par défaut on masque _id (change si tu veux le mapper vers "id")
         return {"_id": 0} if self._hide_mongo_id else {}
 
-    # -- Read ----------------------------------------------------------------
+    # -- Read ---------------------------------------------------------------
     def find(
         self,
         query: Dict[str, Any] | None = None,
@@ -83,7 +85,7 @@ class BaseDao:
         )
         return {"items": items, "page": page, "per_page": per_page, "total": total}
 
-    # -- Write ---------------------------------------------------------------
+    # -- Write --------------------------------------------------------------
     def insert_one(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         self.col.insert_one(payload)
         return self.serialize(payload)
@@ -99,7 +101,6 @@ class BaseDao:
         upsert: bool = False,
         set_operator: bool = True,
     ) -> int:
-        # Par défaut on fait un $set pour éviter d'écraser tout le doc
         ops = {"$set": update} if set_operator else update
         res = self.col.update_one(query, ops, upsert=upsert)
         return res.modified_count + (1 if res.upserted_id else 0)
@@ -108,15 +109,15 @@ class BaseDao:
         return self.col.delete_one(query).deleted_count
 
     # -- Utils --------------------------------------------------------------
-    def serialize(self, response):
+    def serialize(self, response: Any) -> Any:
         if isinstance(response, ObjectId):
             return str(response)
-        elif isinstance(response, dict):
+        if isinstance(response, dict):
             return {key: self.serialize(value) for key, value in response.items()}
-        elif isinstance(response, list):
+        if isinstance(response, list):
             return [self.serialize(item) for item in response]
-        else:
-            return response
-    
-    def get_current_time(self) -> str:
+        return response
+
+    def get_current_time(self) -> datetime:
         return datetime.utcnow()
+

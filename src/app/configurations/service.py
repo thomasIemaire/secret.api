@@ -3,14 +3,20 @@ from bson.objectid import ObjectId
 from src.helpers.base_service import BaseService
 import random, re
 
+from .dao import ConfigurationsDao
+
+
 class ConfigurationsService(BaseService):
-    collection_name = "models_configurations"
+
+    def __init__(self, db: Database) -> None:
+        super().__init__(db)
+        self.configurations_dao = ConfigurationsDao(db)
 
     def find_all(self) -> list[dict]:
-        return self.find(sort=[("created_at", -1)], projection={"attributes": 0, "formats": 0, "randomizers": 0})
+        return self.configurations_dao.find(sort=[("created_at", -1)], projection={"attributes": 0, "formats": 0, "randomizers": 0})
 
     def find_one_by_id(self, id: str) -> dict | None:
-        return self.find_one({"_id": ObjectId(id)})
+        return self.configurations_dao.find_one({"_id": ObjectId(id)})
 
     def create(self, user_id: str, data: dict) -> dict:
         doc = {
@@ -20,13 +26,13 @@ class ConfigurationsService(BaseService):
             "formats": data.get("formats", []),
             "randomizers": data.get("randomizers", []),
             "created_by": ObjectId(user_id),
-            "created_at": self.get_current_time(),
+            "created_at": self.configurations_dao.get_current_time(),
             "possibilities": self.calculate_max_configuration_possibilities(data)
         }
 
-        self.insert_one(doc)
+        self.configurations_dao.insert_one(doc)
 
-        return self.serialize(doc)
+        return self.configurations_dao.serialize(doc)
     
     def calculate_max_configuration_possibilities(
             self,
@@ -63,7 +69,7 @@ class ConfigurationsService(BaseService):
             case "configuration":
                 config_id = parameters.get("object_id")
                 if config_id:
-                    configuration = self.find_one({"_id": ObjectId(config_id)})
+                    configuration = self.configurations_dao.find_one({"_id": ObjectId(config_id)})
                     size = self.calculate_max_configuration_possibilities(configuration)
                 return size
             case _:

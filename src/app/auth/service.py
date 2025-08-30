@@ -3,14 +3,20 @@ from pymongo.database import Database
 from bson.objectid import ObjectId
 from src.helpers.base_service import BaseService
 from src.helpers.avatar import generate_avatar
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, create_refresh_token
 import hashlib, base64, uuid, hmac, os
 
-class AuthService(BaseService):
-    collection_name = "users"
+from .dao import AuthDao
 
-    def find(self, query = None, *, projection = {"password": 0, "apikey": 0}, sort = None, limit = None, skip = 0):
-        return super().find(query, projection=projection, sort=sort, limit=limit, skip=skip)
+
+class AuthService(BaseService):
+
+    def __init__(self, db: Database) -> None:
+        super().__init__(db)
+        self.auth_dao = AuthDao(db)
+
+    def find(self, query=None, *, projection={"password": 0, "apikey": 0}, sort=None, limit=None, skip=0):
+        return self.auth_dao.find(query, projection=projection, sort=sort, limit=limit, skip=skip)
 
     def generate_apikey(self) -> str:
         return str(uuid.uuid4())
@@ -31,7 +37,7 @@ class AuthService(BaseService):
         if not email or "@" not in email:
             raise ValueError("Email invalide")
 
-        if self.find_one({"email": email}):
+        if self.auth_dao.find_one({"email": email}):
             raise ValueError("Email déjà utilisé")
 
         if not data.get("firstname") or not data.get("lastname"):
@@ -49,7 +55,7 @@ class AuthService(BaseService):
             "role": "user",
         }
 
-        self.insert_one(user)
+        user = self.auth_dao.insert_one(user)
 
         img = generate_avatar(email, 800)
         avatar_dir = os.path.join("src", "public", "avatars")
@@ -60,7 +66,7 @@ class AuthService(BaseService):
         token, refresh = self.token(user=user)
         user.pop("password", None)
 
-        return {"token": token, "refresh_token": refresh, "user": self.serialize(user)}
+        return {"token": token, "refresh_token": refresh, "user": user}
 
     def login(self, data: Dict[str, Any]) -> Dict[str, Any]:
         email = (data.get("email") or "").strip().lower()
@@ -68,7 +74,7 @@ class AuthService(BaseService):
         if not email or not password:
             raise ValueError("Email et password requis")
 
-        user = self.find_one({"email": email})
+        user = self.auth_dao.find_one({"email": email})
         if not user or not self.verify_password(password, user["password"], user["apikey"]):
             raise ValueError("Email ou mot de passe invalide")
 
@@ -80,7 +86,7 @@ class AuthService(BaseService):
     
     def token(self, *, user_id: str = None, user: Dict[str, Any]) -> tuple:
         if not user:
-            user = self.find_one({"_id": ObjectId(user_id)})
+            user = self.auth_dao.find_one({"_id": ObjectId(user_id)})
         if not user:
             raise ValueError("Utilisateur introuvable")
         
@@ -92,7 +98,7 @@ class AuthService(BaseService):
         return (token, refresh)
     
     def login_token(self, user_id: str) -> Dict[str, Any]:
-        user = self.find_one({"_id": ObjectId(user_id)})
+        user = self.auth_dao.find_one({"_id": ObjectId(user_id)})
         if not user:
             raise ValueError("Utilisateur introuvable")
         
@@ -103,4 +109,4 @@ class AuthService(BaseService):
 
     def email_exists(self, email: str) -> bool:
         email = email.strip().lower()
-        return self.find_one({"email": email}) is not None
+        return self.auth_dao.find_one({"email": email}) is not None

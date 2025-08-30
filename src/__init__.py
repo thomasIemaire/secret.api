@@ -47,6 +47,9 @@ def _register_blueprints(app: Flask, db):
     from src.app.playgrounds import create_playgrounds_router
     api_bp.register_blueprint(create_playgrounds_router(db), url_prefix="/playgrounds")
 
+    from src.app.playgrounds_prompts import create_playgrounds_prompts_router
+    api_bp.register_blueprint(create_playgrounds_prompts_router(db), url_prefix="/playgrounds")
+
     from src.app.models import create_models_router
     api_bp.register_blueprint(create_models_router(db), url_prefix="/models")
 
